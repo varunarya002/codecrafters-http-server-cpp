@@ -15,8 +15,8 @@ struct HttpRequest {
 
 HttpRequest extract_request_from_client(const int &client_fd, const int &server_fd) {
   constexpr char PATH_DELIMITER = '/', WHITESPACE_DELIMITER = ' ';
-  std::string client_request(1024, '\0');
-  long bytes_received = recv(client_fd, &client_request, client_request.size(), 0);
+  char req[1024] = {};
+  long bytes_received = recv(client_fd, req, sizeof(req), 0);
 
   if (bytes_received < 0) {
     perror("Receive failed!");
@@ -24,6 +24,8 @@ HttpRequest extract_request_from_client(const int &client_fd, const int &server_
     close(server_fd);
     exit(EXIT_FAILURE);
   }
+
+  std::string client_request(req);
   if (client_request.size() > bytes_received) {
     client_request.resize(bytes_received);
   }
@@ -40,23 +42,21 @@ HttpRequest extract_request_from_client(const int &client_fd, const int &server_
   return request;
 }
 
-void send_response_to_client(const int client_fd, const std::string& response) {
+void send_response_to_client(const int &client_fd, const std::string& response) {
   send(client_fd, response.c_str(), response.size(), 0);
-  std::cout << "Response" << response <<"sent successfully!\n";
+  std::cout << "Response sent successfully!\n";
 }
 
 std::string get_response_from_request(const HttpRequest& request) {
   std::string message = "OK";
   int status_code = 200;
 
-  if (request.path.size() > 0) {
+  if (!request.path.empty()) {
     status_code = 404;
     message = "Not Found";
   }
 
-  std::cout << "REQ->" << request.path << std::endl;
-
-  return "HTTP/1.1\t" + std::to_string(status_code) + "\t" + message + "\r\n\r\n";
+  return "HTTP/1.1 " + std::to_string(status_code) + " " + message + "\r\n\r\n";
 }
 
 int main(int argc, char **argv) {
