@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
 
   // Uncomment this block to pass the first stage
 
-  int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+  int server_fd = socket(AF_INET, SOCK_STREAM, 0); //AF->ADDRESS FAMILY
   if (server_fd < 0) {
    std::cerr << "Failed to create server socket\n";
    return 1;
@@ -33,9 +33,9 @@ int main(int argc, char **argv) {
   }
 
   struct sockaddr_in server_addr;
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(4221);
+  server_addr.sin_family = AF_INET; //AF->ADDRESS FAMILY
+  server_addr.sin_addr.s_addr = INADDR_ANY; //allows the socket to bind to all available interfaces on the host machine. This means the server can accept connections on any network interface.
+  server_addr.sin_port = htons(4221); // Set port. Function htons() (host-to-network short) converts the port number from host byte order to network byte order, which is necessary because network protocols use big-endian byte order.
 
   if (bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) != 0) {
     std::cerr << "Failed to bind to port 4221\n";
