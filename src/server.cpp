@@ -145,9 +145,12 @@ public:
 
   [[nodiscard]] std::string sendResponseForUrl(const HttpRequest &http_request) const {
     const std::string& url_path = http_request.path;
+    if (url_path.empty()) {
+      return DefaultUrlAction("/").execute(http_request);
+    }
 
     for (auto &it: url_map) {
-      std::string pattern = "^" + it.first + "(.*)";
+      std::string pattern = "^" + it.first + "/(.*)";
       std::regex regex_pattern(pattern);
       std::smatch matches;
       if (std::regex_search(url_path, matches, regex_pattern)) {
@@ -155,11 +158,7 @@ public:
         HttpRequest http_request_with_params = HttpRequest();
         http_request_with_params.method = http_request.method;
         http_request_with_params.path = http_request.path;
-        std::string param = matches[1];
-        if (param.starts_with("/")) {
-          param = param.substr(1);
-        }
-        http_request_with_params.request_param = param;
+        http_request_with_params.request_param = matches[1];
 
         return it.second->execute(http_request_with_params);
       }
@@ -236,7 +235,6 @@ int main(int argc, char **argv) {
   std::cout << "Client connected with fd: " << client_fd <<  std::endl;
 
   URLHandler url_handler = URLHandler();
-  url_handler.registerUrl("", std::shared_ptr<AbstractUrlAction>(new DefaultUrlAction("")));
   url_handler.registerUrl("echo", std::shared_ptr<AbstractUrlAction>(new EchoUrlAction("echo")));
 
   const Server server = Server(client_fd, server_fd, url_handler);
