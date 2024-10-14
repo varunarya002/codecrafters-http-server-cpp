@@ -6,7 +6,7 @@
 
 class ThreadPool {
 public:
-    ThreadPool(size_t num_threads);
+    explicit ThreadPool(size_t num_threads);
     ~ThreadPool();
 
     void enqueue(const std::function<void()> task);
