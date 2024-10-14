@@ -15,6 +15,7 @@ struct HttpRequest {
   std::string method;
   std::string path;
   std::string request_param;
+  std::unordered_map<std::string, std::string> headers;
 };
 
 class HttpResponse {
@@ -79,12 +80,43 @@ public:
 
     request.method = client_request.substr(0, path_start_pos);
     request.path = client_request.substr(path_start_pos+1, path_end_pos - path_start_pos - 1);
+    updateHeaderMap(request.headers, client_request);
 
     return request;
   }
 private:
   const int client_fd;
   const int server_fd;
+
+  static void convertToLowerCase(std::string& text) {
+    for(auto& c : text)
+    {
+      c = tolower(c);
+    }
+  }
+
+  static void updateHeaderMap(std::unordered_map<std::string, std::string>& headers, const std::string& client_request) {
+    std::string CARRIAGE_DELIMITER = "\r\n", KEY_VALUE_DELIMITER = ": ";
+    size_t header_start_pos = client_request.find_first_of(CARRIAGE_DELIMITER);
+    size_t header_end_pos = client_request.find_last_of(CARRIAGE_DELIMITER);
+    std::string headers_text = client_request.substr(header_start_pos+2, header_end_pos - header_start_pos - 3);
+
+    header_start_pos = 0;
+    header_end_pos = headers_text.find_last_of(CARRIAGE_DELIMITER);
+
+    while (header_start_pos < header_end_pos) {
+      size_t value_start_pos = headers_text.find_first_of(KEY_VALUE_DELIMITER, header_start_pos);
+      size_t value_end_pos = headers_text.find_first_of(CARRIAGE_DELIMITER, header_start_pos);
+
+      std::string key = headers_text.substr(header_start_pos, value_start_pos - header_start_pos);
+      std::string value = headers_text.substr(value_start_pos+2, value_end_pos - value_start_pos - 2);
+      convertToLowerCase(key);
+      convertToLowerCase(value);
+      headers[key] = value;
+
+      header_start_pos = headers_text.find_first_of(CARRIAGE_DELIMITER, header_start_pos) + 2;
+    }
+  }
 };
 
 class AbstractUrlAction {
@@ -135,6 +167,20 @@ public:
   }
 };
 
+class UserAgentAction : public AbstractUrlAction {
+public:
+  explicit UserAgentAction(const std::string &resource_name)
+    : AbstractUrlAction(resource_name) {
+  }
+
+  [[nodiscard]] std::string execute(const HttpRequest &http_request) const override {
+    const std::string message = "OK";
+    std::string body = http_request.headers.at(http_request.path);
+    HttpResponse http_response = HttpResponse(message, 200, "text/plain", body.length(), body);
+    return http_response.sendResponse();
+  }
+};
+
 class URLHandler {
 public:
   URLHandler() = default;
@@ -144,9 +190,9 @@ public:
   }
 
   [[nodiscard]] std::string sendResponseForUrl(const HttpRequest &http_request) const {
-    const std::string& url_path = http_request.path;
-    if (url_path.empty()) {
-      return DefaultUrlAction("/").execute(http_request);
+    std::string url_path = http_request.path;
+    if (url_path[url_path.size()-1] != '/') {
+      url_path.push_back('/');
     }
 
     for (auto &it: url_map) {
@@ -159,6 +205,7 @@ public:
         http_request_with_params.method = http_request.method;
         http_request_with_params.path = http_request.path;
         http_request_with_params.request_param = matches[1];
+        http_request_with_params.headers = http_request.headers;
 
         return it.second->execute(http_request_with_params);
       }
@@ -235,7 +282,9 @@ int main(int argc, char **argv) {
   std::cout << "Client connected with fd: " << client_fd <<  std::endl;
 
   URLHandler url_handler = URLHandler();
+  url_handler.registerUrl("", std::shared_ptr<AbstractUrlAction>(new DefaultUrlAction("")));
   url_handler.registerUrl("echo", std::shared_ptr<AbstractUrlAction>(new EchoUrlAction("echo")));
+  url_handler.registerUrl("user-agent", std::shared_ptr<AbstractUrlAction>(new UserAgentAction("user-agent")));
 
   const Server server = Server(client_fd, server_fd, url_handler);
   server.sendResponse();
