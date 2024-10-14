@@ -3,6 +3,8 @@
 #include <functional>
 #include <thread>
 #include <vector>
+#include <queue>
+#include <mutex>
 
 class ThreadPool {
 public:
