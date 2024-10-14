@@ -204,7 +204,11 @@ public:
         HttpRequest http_request_with_params = HttpRequest();
         http_request_with_params.method = http_request.method;
         http_request_with_params.path = http_request.path;
-        http_request_with_params.request_param = matches[1];
+        std::string param = matches[1];
+        if (param.ends_with("/")) {
+          param.pop_back();
+        }
+        http_request_with_params.request_param = param;
         http_request_with_params.headers = http_request.headers;
 
         return it.second->execute(http_request_with_params);
