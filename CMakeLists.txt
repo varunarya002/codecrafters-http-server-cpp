@@ -20,6 +20,7 @@ add_executable(server ${SOURCE_FILES}
         src/url/not_found_url_action.h
         src/url/echo_url_action.h
         src/url/user_agent_url_action.h
-        src/concurrent/thread_pool.h)
+        src/concurrent/thread_pool.h
+        src/url/file_url_action.h)
 
 target_link_libraries(server PRIVATE Threads::Threads ZLIB::ZLIB)

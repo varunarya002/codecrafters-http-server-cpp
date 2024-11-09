@@ -4,7 +4,7 @@
 
 class HttpResponse {
 public:
-    HttpResponse(const std::string &message, const int status_code, const std::string &content_type, const int content_length, const std::string &body):
+    HttpResponse(const std::string &message, const int status_code, const std::string &content_type, size_t content_length, const std::string &body):
     message(message), status_code(status_code), body(body), content_type(content_type), content_length(content_length) {}
     [[nodiscard]] std::string sendResponse() const {
         std::string WHITESPACE_DELIMITER = " ";
@@ -33,7 +33,7 @@ private:
     int status_code;
     std::string body;
     std::string content_type;
-    int content_length;
+    size_t content_length;
 };
 
 

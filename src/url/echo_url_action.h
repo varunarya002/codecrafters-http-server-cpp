@@ -9,10 +9,9 @@ public:
       : AbstractUrlAction(resource_name) {
     }
 
-    [[nodiscard]] std::string execute(const HttpRequest &http_request) const override {
+    [[nodiscard]] HttpResponse execute(const HttpRequest &http_request) const override {
         const std::string message = "OK";
-        HttpResponse http_response = HttpResponse(message, 200, "text/plain", http_request.request_param.length(), http_request.request_param);
-        return http_response.sendResponse();
+        return HttpResponse(message, 200, "text/plain", http_request.request_param.length(), http_request.request_param);
     }
 };
 

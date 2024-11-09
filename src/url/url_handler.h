@@ -40,10 +40,10 @@ public:
                 http_request_with_params.request_param = param;
                 http_request_with_params.headers = http_request.headers;
 
-                return it.second->execute(http_request_with_params);
+                return it.second->execute(http_request_with_params).sendResponse();
             }
         }
-        return NotFoundUrlAction("404").execute(http_request);
+        return NotFoundUrlAction("404").execute(http_request).sendResponse();
     }
 private:
     std::pmr::unordered_map<std::string, std::shared_ptr<AbstractUrlAction>> url_map;

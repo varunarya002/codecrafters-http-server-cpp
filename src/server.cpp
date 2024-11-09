@@ -16,6 +16,7 @@
 #include "url/url_handler.h"
 #include "url/user_agent_url_action.h"
 #include "concurrent/thread_pool.h"
+#include "url/file_url_action.h"
 
 class Server {
 public:
@@ -79,6 +80,7 @@ int main(int argc, char **argv) {
   url_handler.registerUrl("", std::shared_ptr<AbstractUrlAction>(new DefaultUrlAction("")));
   url_handler.registerUrl("echo", std::shared_ptr<AbstractUrlAction>(new EchoUrlAction("echo")));
   url_handler.registerUrl("user-agent", std::shared_ptr<AbstractUrlAction>(new UserAgentAction("user-agent")));
+  url_handler.registerUrl("files", std::shared_ptr<AbstractUrlAction>(new FileUrlAction("files")));
 
   struct sockaddr_in client_addr;
   int client_addr_len = sizeof(client_addr);
