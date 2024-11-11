@@ -18,7 +18,7 @@ public:
         url_map[url_name] = std::move(action);
     }
 
-    [[nodiscard]] std::string sendResponseForUrl(const HttpRequest &http_request) const {
+    [[nodiscard]] std::string sendResponseForUrl(const HttpRequest &http_request, const std::string& directory_name) const {
         std::string url_path = http_request.path;
         if (url_path[url_path.size()-1] != '/') {
             url_path.push_back('/');
@@ -39,6 +39,7 @@ public:
                 }
                 http_request_with_params.request_param = param;
                 http_request_with_params.headers = http_request.headers;
+                http_request_with_params.directory_name = directory_name;
 
                 return it.second->execute(http_request_with_params).sendResponse();
             }

@@ -18,7 +18,7 @@ public:
     }
 
     [[nodiscard]] HttpResponse execute(const HttpRequest &http_request) const override {
-        const std:: string filename = http_request.request_param;
+        const std:: string filename = http_request.directory_name + http_request.request_param;
 
         if (doesFileExist(filename)) {
             return returnFileResponse(filename);

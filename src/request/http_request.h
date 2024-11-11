@@ -8,6 +8,7 @@ struct HttpRequest {
     std::string path;
     std::string request_param;
     std::unordered_map<std::string, std::string> headers;
+    std::string directory_name;
 };
 
 #endif //HTTP_REQUEST_H

@@ -21,10 +21,10 @@
 class Server {
 public:
   Server(const int &client_fd, const int &server_fd, URLHandler& url_handler): client_fd(client_fd), server_fd(server_fd), url_handler(url_handler) {};
-  void sendResponse() const {
+  void sendResponse(const std::string& directory_name) const {
     HttpRequestHandler request_handler = HttpRequestHandler(client_fd, server_fd);
 
-    std::string response = url_handler.sendResponseForUrl(request_handler.parseRequest());
+    std::string response = url_handler.sendResponseForUrl(request_handler.parseRequest(), directory_name);
     send(client_fd, response.c_str(), response.size(), 0);
     close(client_fd);
 
@@ -40,9 +40,15 @@ int main(int argc, char **argv) {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
   std::cerr << std::unitbuf;
+  std::string dir;
   
   // You can use print statements as follows for debugging, they'll be visible when running tests.
   std::cout << "Logs from your program will appear here!\n";
+
+  if (argc == 3 && strcmp(argv[1], "--directory") == 0)
+  {
+    dir = argv[2];
+  }
 
   // Uncomment this block to pass the first stage
 
@@ -97,7 +103,7 @@ int main(int argc, char **argv) {
     try {
       if (client_fd >= 0) {
         const Server server = Server(client_fd, server_fd, url_handler);
-        pool.enqueue([server] {server.sendResponse();});
+        pool.enqueue([server, dir] {server.sendResponse(dir);});
         std::cout << "Client connected with fd: " << client_fd <<  std::endl;
       }
     } catch (const std::exception& e) {
