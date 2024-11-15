@@ -1,5 +1,6 @@
 #ifndef HTTP_RESPONSE_H
 #define HTTP_RESPONSE_H
+#include <sstream>
 #include <string>
 
 class HttpResponse {
@@ -10,23 +11,22 @@ public:
         std::string WHITESPACE_DELIMITER = " ";
         std::string CARRIAGE_DELIMITER = "\r\n";
         std::string COLON_DELIMITER = ":";
-        std::string http_response = "HTTP/1.1";
+        std::ostringstream http_response;
         std::string CONTENT_TYPE = "Content-Type";
         std::string CONTENT_LENGTH = "Content-Length";
 
-        http_response = http_response + WHITESPACE_DELIMITER + std::to_string(status_code);
-        http_response = http_response + WHITESPACE_DELIMITER + message;
-        http_response = http_response + CARRIAGE_DELIMITER;
+        http_response << "HTTP/1.1" << WHITESPACE_DELIMITER << status_code << WHITESPACE_DELIMITER << message << CARRIAGE_DELIMITER;
 
-        //Add headers
-        http_response = http_response + CONTENT_TYPE + COLON_DELIMITER + WHITESPACE_DELIMITER + content_type + CARRIAGE_DELIMITER;
-        http_response = http_response + CONTENT_LENGTH + COLON_DELIMITER + WHITESPACE_DELIMITER + std::to_string(content_length) + CARRIAGE_DELIMITER;
-        http_response = http_response + CARRIAGE_DELIMITER;
+        // Add headers
+        http_response << CONTENT_TYPE << COLON_DELIMITER << WHITESPACE_DELIMITER << content_type << CARRIAGE_DELIMITER;
+        http_response << CONTENT_LENGTH << COLON_DELIMITER << WHITESPACE_DELIMITER << content_length << CARRIAGE_DELIMITER;
 
-        //Add body
-        http_response += body;
+        // Add a blank line to separate headers from body
+        http_response << CARRIAGE_DELIMITER;
 
-        return http_response;
+        http_response << body;
+
+        return http_response.str();
     }
 private:
     std::string message;

@@ -18,6 +18,17 @@ public:
     }
 
     [[nodiscard]] HttpResponse execute(const HttpRequest &http_request) const override {
+        try {
+            if (http_request.method == "POST") {
+                return executePostRequest(http_request);
+            }
+            return executeGetRequest(http_request);
+        } catch (const std::exception &e) {
+            std::cerr << e.what() << std::endl;
+        }
+    }
+private:
+    [[nodiscard]] static HttpResponse executeGetRequest(const HttpRequest &http_request) {
         const std:: string filename = http_request.directory_name + http_request.request_param;
 
         if (doesFileExist(filename)) {
@@ -25,7 +36,22 @@ public:
         }
         return returnFileNotFindResponse();
     }
-private:
+
+    [[nodiscard]] static HttpResponse executePostRequest(const HttpRequest &http_request) {
+        const std:: string file = http_request.directory_name + http_request.request_param;
+
+        // Create and write to the file
+        std::ofstream outfile(file);
+        if (outfile.is_open()) {
+            outfile << http_request.body;
+            outfile.close();
+            std::cout << "File created successfully: " << file << '\n';
+        } else {
+            std::cerr << "Failed to create the file: " << file << '\n';
+        }
+        return HttpResponse("Created", 201, "application/octet-stream", 0, "");
+    }
+
     static HttpResponse returnFileResponse(const std::string &filename) {
         const std::string message = "OK";
         const std::string content = readDataFromTheFile(filename);

@@ -11,6 +11,7 @@ public:
   HttpRequestHandler(const int &client_fd, const int &server_fd): client_fd(client_fd), server_fd(server_fd) {}
   [[nodiscard]] HttpRequest parseRequest() const {
     constexpr char PATH_DELIMITER = '/', WHITESPACE_DELIMITER = ' ';
+    std::string CARRIAGE_DELIMITER = "\r\n";
     char req[1024] = {};
     long bytes_received = recv(client_fd, req, sizeof(req), 0);
 
@@ -32,9 +33,10 @@ public:
     size_t path_start_pos = client_request.find_first_of(PATH_DELIMITER);
     size_t path_end_pos = client_request.find_first_of(WHITESPACE_DELIMITER, path_start_pos);
 
-    request.method = client_request.substr(0, path_start_pos);
+    request.method = client_request.substr(0, path_start_pos-1);
     request.path = client_request.substr(path_start_pos+1, path_end_pos - path_start_pos - 1);
     updateHeaderMap(request.headers, client_request);
+    request.body = client_request.substr(client_request.find_last_of(CARRIAGE_DELIMITER)+1);
 
     return request;
   }
