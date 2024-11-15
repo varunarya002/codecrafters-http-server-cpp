@@ -15,7 +15,7 @@ public:
 
     [[nodiscard]] HttpResponse execute(const HttpRequest &http_request) const override {
         const std::string message = "OK";
-        return HttpResponse(message, 200, "text/plain", 0, "");
+        return HttpResponse(message, 200, "text/plain", 0, "", http_request.headers);
     }
 };
 

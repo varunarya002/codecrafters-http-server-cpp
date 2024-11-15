@@ -44,13 +44,6 @@ private:
   const int client_fd;
   const int server_fd;
 
-  static void convertToLowerCase(std::string& text) {
-    for(auto& c : text)
-    {
-      c = tolower(c);
-    }
-  }
-
   static void updateHeaderMap(std::unordered_map<std::string, std::string>& headers, const std::string& client_request) {
     std::string CARRIAGE_DELIMITER = "\r\n", KEY_VALUE_DELIMITER = ": ";
     size_t header_start_pos = client_request.find_first_of(CARRIAGE_DELIMITER);
@@ -66,8 +59,6 @@ private:
 
       std::string key = headers_text.substr(header_start_pos, value_start_pos - header_start_pos);
       std::string value = headers_text.substr(value_start_pos+2, value_end_pos - value_start_pos - 2);
-      convertToLowerCase(key);
-      convertToLowerCase(value);
       headers[key] = value;
 
       header_start_pos = headers_text.find_first_of(CARRIAGE_DELIMITER, header_start_pos) + 2;

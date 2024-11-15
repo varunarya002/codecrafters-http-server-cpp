@@ -11,7 +11,7 @@ public:
 
     [[nodiscard]] HttpResponse execute(const HttpRequest &http_request) const override {
         const std::string message = "Not Found";
-        return HttpResponse(message, 404, "text/plain", 0, "");
+        return HttpResponse(message, 404, "text/plain", 0, "", http_request.headers);
     }
 };
 
