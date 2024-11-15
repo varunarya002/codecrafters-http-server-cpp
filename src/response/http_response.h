@@ -16,12 +16,14 @@ public:
 
         http_response << "HTTP/1.1" << WHITESPACE_DELIMITER << status_code << WHITESPACE_DELIMITER << message << CARRIAGE_DELIMITER;
 
-        std::string requested_encoding = headers.at(ACCEPT_ENCODING);
-        // Add headers
-        for (const auto& server_encoding: supported_encodings) {
-            if (requested_encoding == server_encoding) {
-                http_response << CONTENT_ENCODING << COLON_DELIMITER << WHITESPACE_DELIMITER << requested_encoding << CARRIAGE_DELIMITER;
-                break;
+        if (headers.find(ACCEPT_ENCODING) != headers.end()) {
+            std::string requested_encoding = headers.at(ACCEPT_ENCODING);
+            // Add headers
+            for (const auto& server_encoding: supported_encodings) {
+                if (requested_encoding == server_encoding) {
+                    http_response << CONTENT_ENCODING << COLON_DELIMITER << WHITESPACE_DELIMITER << requested_encoding << CARRIAGE_DELIMITER;
+                    break;
+                }
             }
         }
 
