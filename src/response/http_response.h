@@ -1,6 +1,7 @@
 #ifndef HTTP_RESPONSE_H
 #define HTTP_RESPONSE_H
 
+#include <zlib.h>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -9,10 +10,10 @@
 
 class HttpResponse {
 public:
-    HttpResponse(const std::string& message, int status_code, const std::string& content_type, size_t content_length, const std::string& body, std::unordered_map<std::string, std::string> headers)
-        : message(message), status_code(status_code), body(body), content_type(content_type), content_length(content_length), headers(std::move(headers)) {}
+    HttpResponse(const std::string& message, int status_code, const std::string& content_type, size_t content_length, std::string body, std::unordered_map<std::string, std::string> headers)
+        : message(message), status_code(status_code), body(std::move(body)), content_type(content_type), content_length(content_length), headers(std::move(headers)) {}
 
-    [[nodiscard]] std::string sendResponse() const {
+    [[nodiscard]] std::string sendResponse() {
         std::ostringstream http_response;
 
         // Status line
@@ -21,6 +22,8 @@ public:
         // Content-Encoding header if applicable
         if (const auto encoding = getSupportedEncodings(headers); !encoding.empty()) {
             http_response << CONTENT_ENCODING << COLON_DELIMITER << WHITESPACE_DELIMITER << encoding << CARRIAGE_DELIMITER;
+            body = compressString(body);
+            content_length = body.size();
         }
 
         // Content-Type and Content-Length headers
@@ -39,7 +42,7 @@ public:
 private:
     std::string message;
     int status_code;
-    std::string body;
+    mutable std::string body;
     std::string content_type;
     size_t content_length;
     std::unordered_map<std::string, std::string> headers;
@@ -98,6 +101,43 @@ private:
 
         return "";
     }
+
+    static std::string compressString(const std::string& str, int compressionlevel = Z_BEST_COMPRESSION) {
+        z_stream zs; // z_stream is zlib's control structure
+        memset(&zs, 0, sizeof(zs));
+
+        if (deflateInit2(&zs, compressionlevel, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+            throw std::runtime_error("deflateInit failed while compressing.");
+        }
+
+        zs.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(str.data()));
+        zs.avail_in = str.size();
+
+        int ret;
+        char outbuffer[32768];
+        std::string outstring;
+
+        // Compress the input string in chunks
+        do {
+            zs.next_out = reinterpret_cast<Bytef*>(outbuffer);
+            zs.avail_out = sizeof(outbuffer);
+
+            ret = deflate(&zs, Z_FINISH);
+
+            if (outstring.size() < zs.total_out) {
+                outstring.append(outbuffer, zs.total_out - outstring.size());
+            }
+        } while (ret == Z_OK);
+
+        deflateEnd(&zs);
+
+        if (ret != Z_STREAM_END) {
+            throw std::runtime_error("Exception during zlib compression.");
+        }
+
+        return outstring;
+    }
+
 };
 
 #endif // HTTP_RESPONSE_H
