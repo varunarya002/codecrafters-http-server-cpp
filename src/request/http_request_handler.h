@@ -1,69 +1,119 @@
 #ifndef HTTP_REQUEST_HANDLER_H
 #define HTTP_REQUEST_HANDLER_H
+
 #include <iostream>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <array>
+#include <string>
+#include <stdexcept>
 
 #include "http_request.h"
 
+/**
+ * @class HttpRequestHandler
+ * @brief Handles HTTP request parsing from socket data
+ */
 class HttpRequestHandler {
 public:
-  HttpRequestHandler(const int &client_fd, const int &server_fd): client_fd(client_fd), server_fd(server_fd) {}
+  /**
+   * @brief Constructs a new HTTP request handler
+   * @param client_fd Client socket file descriptor
+   * @param server_fd Server socket file descriptor
+   */
+  HttpRequestHandler(const int& client_fd, const int& server_fd)
+    : client_fd_(client_fd), server_fd_(server_fd) {}
+
+  /**
+   * @brief Parses an HTTP request from the client socket
+   * @return HttpRequest The parsed HTTP request object
+   */
   [[nodiscard]] HttpRequest parseRequest() const {
-    constexpr char PATH_DELIMITER = '/', WHITESPACE_DELIMITER = ' ';
-    std::string CARRIAGE_DELIMITER = "\r\n";
-    char req[1024] = {};
-    long bytes_received = recv(client_fd, req, sizeof(req), 0);
+    static constexpr size_t kMaxRequestSize = 1024;
+    static constexpr char kPathDelimiter = '/';
+    static constexpr char kWhitespaceDelimiter = ' ';
+    static const std::string kCarriageDelimiter = "\r\n";
+    
+    std::array<char, kMaxRequestSize> buffer{};
+    const long bytes_received = recv(client_fd_, buffer.data(), buffer.size(), 0);
 
     if (bytes_received < 0) {
-      perror("Receive failed!");
-      close(client_fd);
-      close(server_fd);
-      exit(EXIT_FAILURE);
+      close(client_fd_);
+      close(server_fd_);
+      throw std::runtime_error("Failed to receive data from client");
     }
 
-    std::string client_request(req);
-    if (client_request.size() > bytes_received) {
-      client_request.resize(bytes_received);
+    HttpRequest request;
+    if (bytes_received == 0) {
+      return request; // Empty request
     }
-    std::cout << "bytes received: " << bytes_received << std::endl;
-    std::cout << "Client message length: " << client_request.size() << std::endl;
 
-    HttpRequest request = HttpRequest();
-    size_t path_start_pos = client_request.find_first_of(PATH_DELIMITER);
-    size_t path_end_pos = client_request.find_first_of(WHITESPACE_DELIMITER, path_start_pos);
-
-    request.method = client_request.substr(0, path_start_pos-1);
-    request.path = client_request.substr(path_start_pos+1, path_end_pos - path_start_pos - 1);
-    updateHeaderMap(request.headers, client_request);
-    request.body = client_request.substr(client_request.find_last_of(CARRIAGE_DELIMITER)+1);
+    // Convert received bytes to string and ensure proper size
+    std::string client_request(buffer.data(), bytes_received);
+    
+    // Parse HTTP method and path
+    const size_t path_start_pos = client_request.find_first_of(kPathDelimiter);
+    const size_t path_end_pos = client_request.find_first_of(kWhitespaceDelimiter, path_start_pos);
+    
+    request.method = client_request.substr(0, path_start_pos - 1);
+    request.path = client_request.substr(path_start_pos + 1, path_end_pos - path_start_pos - 1);
+    
+    // Parse headers and body
+    parseHeaders(request.headers, client_request);
+    request.body = client_request.substr(client_request.find_last_of(kCarriageDelimiter) + 1);
 
     return request;
   }
+
 private:
-  const int client_fd;
-  const int server_fd;
+  const int client_fd_;
+  const int server_fd_;
 
-  static void updateHeaderMap(std::unordered_map<std::string, std::string>& headers, const std::string& client_request) {
-    std::string CARRIAGE_DELIMITER = "\r\n", KEY_VALUE_DELIMITER = ": ";
-    size_t header_start_pos = client_request.find_first_of(CARRIAGE_DELIMITER);
-    size_t header_end_pos = client_request.find_last_of(CARRIAGE_DELIMITER);
-    std::string headers_text = client_request.substr(header_start_pos+2, header_end_pos - header_start_pos - 3);
-
-    header_start_pos = 0;
-    header_end_pos = headers_text.find_last_of(CARRIAGE_DELIMITER);
-
-    while (header_start_pos < header_end_pos) {
-      size_t value_start_pos = headers_text.find_first_of(KEY_VALUE_DELIMITER, header_start_pos);
-      size_t value_end_pos = headers_text.find_first_of(CARRIAGE_DELIMITER, header_start_pos);
-
-      std::string key = headers_text.substr(header_start_pos, value_start_pos - header_start_pos);
-      std::string value = headers_text.substr(value_start_pos+2, value_end_pos - value_start_pos - 2);
+  /**
+   * @brief Parses HTTP headers from the request string
+   * @param headers Map to store the parsed headers
+   * @param request_str Full HTTP request string
+   */
+  static void parseHeaders(std::unordered_map<std::string, std::string>& headers, 
+                          const std::string& request_str) {
+    static const std::string kCarriageDelimiter = "\r\n";
+    static const std::string kKeyValueDelimiter = ": ";
+    
+    // Find headers section in the request
+    const size_t header_start = request_str.find_first_of(kCarriageDelimiter);
+    const size_t header_end = request_str.find_last_of(kCarriageDelimiter);
+    
+    if (header_start == std::string::npos || header_end == std::string::npos) {
+      return;  // No headers found
+    }
+    
+    // Extract headers text section
+    const std::string headers_text = request_str.substr(
+        header_start + 2, header_end - header_start - 3);
+    
+    // Parse individual headers
+    size_t pos = 0;
+    const size_t headers_end = headers_text.find_last_of(kCarriageDelimiter);
+    
+    while (pos < headers_end) {
+      const size_t key_end = headers_text.find_first_of(kKeyValueDelimiter, pos);
+      const size_t value_end = headers_text.find_first_of(kCarriageDelimiter, pos);
+      
+      if (key_end == std::string::npos || value_end == std::string::npos) {
+        break;  // Malformed header
+      }
+      
+      const std::string key = headers_text.substr(pos, key_end - pos);
+      const std::string value = headers_text.substr(
+          key_end + kKeyValueDelimiter.length(), 
+          value_end - key_end - kKeyValueDelimiter.length());
+          
       headers[key] = value;
-
-      header_start_pos = headers_text.find_first_of(CARRIAGE_DELIMITER, header_start_pos) + 2;
+      
+      // Move to next header
+      pos = value_end + kCarriageDelimiter.length();
     }
   }
 };
 
-#endif //HTTP_REQUEST_HANDLER_H
+#endif // HTTP_REQUEST_HANDLER_H

@@ -22,13 +22,26 @@ class Server {
 public:
   Server(const int &client_fd, const int &server_fd, URLHandler& url_handler): client_fd(client_fd), server_fd(server_fd), url_handler(url_handler) {};
   void sendResponse(const std::string& directory_name) const {
-    HttpRequestHandler request_handler = HttpRequestHandler(client_fd, server_fd);
+    HttpRequestHandler request_handler(client_fd, server_fd);
 
-    std::string response = url_handler.sendResponseForUrl(request_handler.parseRequest(), directory_name);
-    send(client_fd, response.c_str(), response.size(), 0);
+    while (true) {
+      // Parse incoming HTTP request
+      HttpRequest request = request_handler.parseRequest();
+      
+      // Check if connection should be closed
+      if (request.headers.empty() || 
+          (request.headers.contains("Connection") && 
+           request.headers.at("Connection") == "close")) {
+        break;
+      }
+
+      // Process request and send response
+      std::string response = url_handler.sendResponseForUrl(request, directory_name);
+      size_t response_size = response.size();
+      send(client_fd, response.c_str(), response_size, 0);
+    }
+    
     close(client_fd);
-
-    std::cout << "Response sent successfully!\n";
   }
 private:
   const int client_fd;
