@@ -29,9 +29,7 @@ public:
       HttpRequest request = request_handler.parseRequest();
       
       // Check if connection should be closed
-      if (request.headers.empty() || 
-          (request.headers.contains("Connection") && 
-           request.headers.at("Connection") == "close")) {
+      if (request.headers.empty()) {
         break;
       }
 
@@ -39,6 +37,10 @@ public:
       std::string response = url_handler.sendResponseForUrl(request, directory_name);
       size_t response_size = response.size();
       send(client_fd, response.c_str(), response_size, 0);
+
+      if (request.headers.contains("Connection") && request.headers.at("Connection") == "close") {
+        break;
+      }
     }
     
     close(client_fd);

@@ -25,6 +25,7 @@ public:
             return executeGetRequest(http_request);
         } catch (const std::exception &e) {
             std::cerr << e.what() << std::endl;
+            throw;
         }
     }
 private:
@@ -49,18 +50,18 @@ private:
         } else {
             std::cerr << "Failed to create the file: " << file << '\n';
         }
-        return HttpResponse("Created", 201, "application/octet-stream", 0, "", http_request.headers);
+        return {"Created", 201, "application/octet-stream", 0, "", http_request.headers};
     }
 
     static HttpResponse returnFileResponse(const std::string &filename, std::unordered_map<std::string, std::string> headers) {
         const std::string message = "OK";
         const std::string content = readDataFromTheFile(filename);
-        return HttpResponse(message, 200, "application/octet-stream", content.length(), content, headers);
+        return {message, 200, "application/octet-stream", content.length(), content, headers};
     }
 
     static HttpResponse returnFileNotFindResponse(std::unordered_map<std::string, std::string> headers) {
         const std::string message = "Not Found";
-        return HttpResponse(message, 404, "application/octet-stream", 0, "", headers);
+        return {message, 404, "application/octet-stream", 0, "", headers};
     }
 
     static bool doesFileExist(const std::string& filename) {
@@ -87,7 +88,5 @@ private:
         return fileContents;
     }
 };
-
-
 
 #endif //FILE_URL_ACTION_H

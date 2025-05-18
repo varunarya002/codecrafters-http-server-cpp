@@ -5,59 +5,144 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include <algorithm>
+#include <stdexcept>
 
+/**
+ * @class HttpResponse
+ * @brief Represents an HTTP response with methods to build and serialize it
+ * 
+ * This class encapsulates all components of an HTTP response including status code,
+ * headers, and body. It provides methods to build a valid HTTP response string
+ * with support for content compression.
+ */
 class HttpResponse {
 public:
-    HttpResponse(const std::string& message, int status_code, const std::string& content_type, size_t content_length, std::string body, std::unordered_map<std::string, std::string> headers)
-        : message(message), status_code(status_code), body(std::move(body)), content_type(content_type), content_length(content_length), headers(std::move(headers)) {}
+    /**
+     * @brief Constructs a new HTTP response with all necessary components
+     * 
+     * @param message Response status message (e.g., "OK", "Not Found")
+     * @param status_code HTTP status code (e.g., 200, 404)
+     * @param content_type MIME type of the response body
+     * @param content_length Length of the response body in bytes
+     * @param body Response body content
+     * @param headers Additional HTTP headers
+     */
+    HttpResponse(
+        std::string  message,
+        int status_code,
+        std::string  content_type,
+        size_t content_length,
+        std::string body,
+        std::unordered_map<std::string, std::string> headers
+    )
+        : message_(std::move(message))
+        , status_code_(status_code)
+        , content_type_(std::move(content_type))
+        , content_length_(content_length)
+        , body_(std::move(body))
+        , headers_(std::move(headers)) 
+    {}
 
+    /**
+     * @brief Builds and returns the complete HTTP response as a string
+     * 
+     * @return std::string The formatted HTTP response
+     */
     [[nodiscard]] std::string sendResponse() {
-        std::ostringstream http_response;
-
-        // Status line
-        http_response << "HTTP/1.1" << WHITESPACE_DELIMITER << status_code << WHITESPACE_DELIMITER << message << CARRIAGE_DELIMITER;
-
-        // Content-Encoding header if applicable
-        if (const auto encoding = getSupportedEncodings(headers); !encoding.empty()) {
-            http_response << CONTENT_ENCODING << COLON_DELIMITER << WHITESPACE_DELIMITER << encoding << CARRIAGE_DELIMITER;
-            body = compressString(body);
-            content_length = body.size();
-        }
-
-        // Content-Type and Content-Length headers
-        http_response << CONTENT_TYPE << COLON_DELIMITER << WHITESPACE_DELIMITER << content_type << CARRIAGE_DELIMITER;
-        http_response << CONTENT_LENGTH << COLON_DELIMITER << WHITESPACE_DELIMITER << content_length << CARRIAGE_DELIMITER;
-
-        // Blank line to separate headers from body
-        http_response << CARRIAGE_DELIMITER;
-
-        // Body
-        http_response << body;
-
-        return http_response.str();
+        std::ostringstream response_stream;
+        
+        appendStatusLine(response_stream);
+        appendHeaders(response_stream);
+        appendBody(response_stream);
+        
+        return response_stream.str();
     }
 
 private:
-    std::string message;
-    int status_code;
-    mutable std::string body;
-    std::string content_type;
-    size_t content_length;
-    std::unordered_map<std::string, std::string> headers;
-
+    // HTTP response components
+    std::string message_;
+    int status_code_;
+    std::string content_type_;
+    size_t content_length_;
+    mutable std::string body_; // Mutable to allow compression in const methods
+    std::unordered_map<std::string, std::string> headers_;
+    
+    // HTTP format constants
     static constexpr const char* WHITESPACE_DELIMITER = " ";
     static constexpr const char* CARRIAGE_DELIMITER = "\r\n";
     static constexpr const char* COLON_DELIMITER = ":";
+    
+    // Common HTTP header names
     static constexpr const char* CONTENT_TYPE = "Content-Type";
     static constexpr const char* CONTENT_LENGTH = "Content-Length";
     static constexpr const char* CONTENT_ENCODING = "Content-Encoding";
     static constexpr const char* ACCEPT_ENCODING = "Accept-Encoding";
+    static constexpr const char* CONNECTION = "Connection";
+    
+    // Supported compression encodings
+    const std::vector<std::string> supported_encodings_ = { "gzip" };
 
-    const std::vector<std::string> supported_encodings = { "gzip" };
+    /**
+     * @brief Appends the HTTP status line to the response stream
+     * 
+     * @param stream The output stream to append to
+     */
+    void appendStatusLine(std::ostringstream& stream) const {
+        stream << "HTTP/1.1" << WHITESPACE_DELIMITER 
+               << status_code_ << WHITESPACE_DELIMITER 
+               << message_ << CARRIAGE_DELIMITER;
+    }
+    
+    /**
+     * @brief Appends all HTTP headers to the response stream
+     * 
+     * @param stream The output stream to append to
+     */
+    void appendHeaders(std::ostringstream& stream) {
+        // Apply compression if supported by the client
+        std::string encoding = getSupportedEncodings(headers_);
+        if (!encoding.empty()) {
+            stream << CONTENT_ENCODING << COLON_DELIMITER << WHITESPACE_DELIMITER 
+                   << encoding << CARRIAGE_DELIMITER;
+            body_ = compressString(body_);
+            content_length_ = body_.size();
+        }
+        
+        // Add standard headers
+        stream << CONTENT_TYPE << COLON_DELIMITER << WHITESPACE_DELIMITER 
+               << content_type_ << CARRIAGE_DELIMITER;
+        stream << CONTENT_LENGTH << COLON_DELIMITER << WHITESPACE_DELIMITER 
+               << content_length_ << CARRIAGE_DELIMITER;
+        
+        // Add Connection: close header if requested
+        if (headers_.contains(CONNECTION) && headers_.at(CONNECTION) == "close") {
+            stream << CONNECTION << COLON_DELIMITER << WHITESPACE_DELIMITER 
+                   << "close" << CARRIAGE_DELIMITER;
+        }
+        
+        // Add blank line to separate headers from body
+        stream << CARRIAGE_DELIMITER;
+    }
+    
+    /**
+     * @brief Appends the response body to the stream
+     * 
+     * @param stream The output stream to append to
+     */
+    void appendBody(std::ostringstream& stream) const {
+        stream << body_;
+    }
 
-    // Helper function to split a string by a delimiter and trim whitespace
+    /**
+     * @brief Splits a string by a delimiter and trims whitespace
+     * 
+     * @param str String to split
+     * @param delimiter Character to split on
+     * @return std::vector<std::string> Vector of trimmed substrings
+     */
     static std::vector<std::string> split(const std::string& str, char delimiter) {
         std::vector<std::string> result;
         size_t start = 0;
@@ -73,7 +158,12 @@ private:
         return result;
     }
 
-    // Helper function to trim leading/trailing whitespace
+    /**
+     * @brief Trims leading and trailing whitespace from a string
+     * 
+     * @param str String to trim
+     * @return std::string Trimmed string
+     */
     static std::string trim(const std::string& str) {
         size_t first = str.find_first_not_of(" \t\n\r");
         size_t last = str.find_last_not_of(" \t\n\r");
@@ -85,15 +175,23 @@ private:
         return str.substr(first, last - first + 1);
     }
 
-    // Function to get supported encoding from the headers
-    [[nodiscard]] std::string getSupportedEncodings(const std::unordered_map<std::string, std::string>& headers) const {
+    /**
+     * @brief Determines which encoding to use based on client preferences
+     * 
+     * @param headers Request headers containing encoding preferences
+     * @return std::string Selected encoding or empty string if none supported
+     */
+    [[nodiscard]] std::string getSupportedEncodings(
+        const std::unordered_map<std::string, std::string>& headers
+    ) const {
         auto it = headers.find(ACCEPT_ENCODING);
 
         if (it != headers.end()) {
             auto requested_encodings = split(it->second, ',');
 
             for (const auto& encoding : requested_encodings) {
-                if (std::find(supported_encodings.begin(), supported_encodings.end(), encoding) != supported_encodings.end()) {
+                if (std::ranges::find(supported_encodings_,
+                                      encoding) != supported_encodings_.end()) {
                     return encoding; // Return first matching encoding
                 }
             }
@@ -102,16 +200,28 @@ private:
         return "";
     }
 
-    static std::string compressString(const std::string& str, int compressionlevel = Z_BEST_COMPRESSION) {
-        z_stream zs; // z_stream is zlib's control structure
-        memset(&zs, 0, sizeof(zs));
+    /**
+     * @brief Compresses a string using zlib with gzip format
+     * 
+     * @param str String to compress
+     * @param compressionLevel Compression level (Z_BEST_COMPRESSION by default)
+     * @return std::string Compressed string
+     * @throws std::runtime_error if compression fails
+     */
+    static std::string compressString(
+        const std::string& str, 
+        int compressionLevel = Z_BEST_COMPRESSION
+    ) {
+        z_stream zs = {}; // z_stream is zlib's control structure
 
-        if (deflateInit2(&zs, compressionlevel, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+        // Initialize deflate with gzip format (15 + 16)
+        if (deflateInit2(&zs, compressionLevel, Z_DEFLATED, 
+                         15 + 16, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
             throw std::runtime_error("deflateInit failed while compressing.");
         }
 
         zs.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(str.data()));
-        zs.avail_in = str.size();
+        zs.avail_in = static_cast<uInt>(str.size());
 
         int ret;
         char outbuffer[32768];
@@ -137,7 +247,6 @@ private:
 
         return outstring;
     }
-
 };
 
 #endif // HTTP_RESPONSE_H
